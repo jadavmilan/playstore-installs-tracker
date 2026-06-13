@@ -1,6 +1,29 @@
 const { google } = require('googleapis');
 const gplay = require('google-play-scraper');
 
+function formatInstalls(installs) {
+  if (!installs) return 'N/A';
+
+  const num = parseInt(installs.replace(/[^0-9]/g, ''));
+
+  if (num >= 1000000000) {
+    const value = num / 1000000000;
+    return Number.isInteger(value) ? `${value}B+` : `${value.toFixed(1)}B+`;
+  }
+
+  if (num >= 1000000) {
+    const value = num / 1000000;
+    return Number.isInteger(value) ? `${value}M+` : `${value.toFixed(1)}M+`;
+  }
+
+  if (num >= 1000) {
+    const value = num / 1000;
+    return Number.isInteger(value) ? `${value}K+` : `${value.toFixed(1)}K+`;
+  }
+
+  return installs;
+}
+
 async function main() {
   const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
 
@@ -33,8 +56,12 @@ async function main() {
       continue;
     }
 
-    // Apple App Store Link
-    if (value.includes('apps.apple.com')) {
+    // Apple App Store links
+    if (
+      value.includes('apps.apple.com') ||
+      value.startsWith('http://apps.apple.com') ||
+      value.startsWith('https://apps.apple.com')
+    ) {
       output.push(['IOS APP', 'IOS APP']);
       continue;
     }
@@ -45,12 +72,14 @@ async function main() {
       });
 
       output.push([
-        app.installs || 'N/A',
+        formatInstalls(app.installs),
         app.title || 'Unknown'
       ]);
 
-      console.log(`${value} => ${app.installs}`);
-    } catch (e) {
+      console.log(
+        `${value} => ${formatInstalls(app.installs)} => ${app.title}`
+      );
+    } catch (error) {
       output.push([
         'NOT FOUND',
         'NOT FOUND'
