@@ -18,7 +18,7 @@ function formatInstalls(installs) {
 
   if (num >= 1000) {
     const value = num / 1000;
-    return Number.isInteger(value) ? `${value}K+` : `${value.toFixed(1)}K+`;
+    return Number.isInteger(value) ? `${value.toFixed(1)}K+` : `${value.toFixed(1)}K+`;
   }
 
   return installs;
@@ -52,17 +52,17 @@ async function main() {
     const value = row[0]?.trim();
 
     if (!value) {
-      output.push(['', '']);
+      output.push(['']);
       continue;
     }
 
-    // Apple App Store links
+    // iOS handling
     if (
       value.includes('apps.apple.com') ||
       value.startsWith('http://apps.apple.com') ||
       value.startsWith('https://apps.apple.com')
     ) {
-      output.push(['IOS APP', 'IOS APP']);
+      output.push(['IOS APP']);
       continue;
     }
 
@@ -72,33 +72,28 @@ async function main() {
       });
 
       output.push([
-        formatInstalls(app.installs),
-        app.title || 'Unknown'
+        formatInstalls(app.installs)
       ]);
 
-      console.log(
-        `${value} => ${formatInstalls(app.installs)} => ${app.title}`
-      );
+      console.log(`${value} => ${formatInstalls(app.installs)}`);
+
     } catch (error) {
-      output.push([
-        'NOT FOUND',
-        'NOT FOUND'
-      ]);
-
+      output.push(['NOT FOUND']);
       console.log(`${value} => NOT FOUND`);
     }
   }
 
+  // Only column H (installs only)
   await sheets.spreadsheets.values.update({
     spreadsheetId: sheetId,
-    range: `H2:I${output.length + 1}`,
+    range: `H2:H${output.length + 1}`,
     valueInputOption: 'RAW',
     requestBody: {
       values: output
     }
   });
 
-  console.log(`Updated ${output.length} rows`);
+  console.log(`Updated ${output.length} rows (ONLY INSTALLS)`);
 }
 
 main().catch(console.error);
