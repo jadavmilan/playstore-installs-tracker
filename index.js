@@ -21,38 +21,48 @@ async function main() {
     range: 'G2:G'
   });
 
-  const packageNames = response.data.values || [];
+  const rows = response.data.values || [];
 
   const output = [];
 
-  for (let i = 0; i < packageNames.length; i++) {
-    const packageName = packageNames[i][0];
+  for (const row of rows) {
+    const value = row[0]?.trim();
 
-    if (!packageName) {
-      output.push(['']);
+    if (!value) {
+      output.push(['', '']);
+      continue;
+    }
+
+    // Apple App Store Link
+    if (value.includes('apps.apple.com')) {
+      output.push(['IOS APP', 'IOS APP']);
       continue;
     }
 
     try {
       const app = await gplay.app({
-        appId: packageName
+        appId: value
       });
 
-      const installs = app.installs || 'N/A';
+      output.push([
+        app.installs || 'N/A',
+        app.title || 'Unknown'
+      ]);
 
-      output.push([installs]);
-
-      console.log(`${packageName} => ${installs}`);
+      console.log(`${value} => ${app.installs}`);
     } catch (e) {
-      output.push(['ERROR']);
+      output.push([
+        'NOT FOUND',
+        'NOT FOUND'
+      ]);
 
-      console.log(`${packageName} => ERROR`);
+      console.log(`${value} => NOT FOUND`);
     }
   }
 
   await sheets.spreadsheets.values.update({
     spreadsheetId: sheetId,
-    range: `H2:H${output.length + 1}`,
+    range: `H2:I${output.length + 1}`,
     valueInputOption: 'RAW',
     requestBody: {
       values: output
