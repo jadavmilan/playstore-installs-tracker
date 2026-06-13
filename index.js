@@ -2,7 +2,6 @@ const { google } = require('googleapis');
 const gplay = require('google-play-scraper');
 
 async function main() {
-
   const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
 
   const auth = new google.auth.GoogleAuth({
@@ -24,49 +23,43 @@ async function main() {
 
   const packageNames = response.data.values || [];
 
-  for (let i = 0; i < packageNames.length; i++) {
+  const output = [];
 
+  for (let i = 0; i < packageNames.length; i++) {
     const packageName = packageNames[i][0];
 
-    if (!packageName) continue;
+    if (!packageName) {
+      output.push(['']);
+      continue;
+    }
 
     try {
-
       const app = await gplay.app({
         appId: packageName
       });
 
       const installs = app.installs || 'N/A';
 
-      const row = i + 2;
+      output.push([installs]);
 
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: sheetId,
-        range: `H${row}`,
-        valueInputOption: 'RAW',
-        requestBody: {
-          values: [[installs]]
-        }
-      });
-
-      console.log(packageName, installs);
-
+      console.log(`${packageName} => ${installs}`);
     } catch (e) {
+      output.push(['ERROR']);
 
-      const row = i + 2;
-
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: sheetId,
-        range: `H${row}`,
-        valueInputOption: 'RAW',
-        requestBody: {
-          values: [['ERROR']]
-        }
-      });
-
-      console.log(packageName, e.message);
+      console.log(`${packageName} => ERROR`);
     }
   }
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: sheetId,
+    range: `H2:H${output.length + 1}`,
+    valueInputOption: 'RAW',
+    requestBody: {
+      values: output
+    }
+  });
+
+  console.log(`Updated ${output.length} rows`);
 }
 
-main();
+main().catch(console.error);
