@@ -3,20 +3,31 @@ const gplay = require('google-play-scraper');
 
 const delay = (ms) => new Promise(res => setTimeout(res, ms));
 
-// 🔥 FORMAT INSTALS
+// Format installs
 function formatInstalls(installs) {
   if (!installs) return null;
 
   const num = parseInt(installs.replace(/[^0-9]/g, ''));
 
-  if (num >= 1000000000) return (num / 1000000000).toFixed(1) + 'B+';
-  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M+';
-  if (num >= 1000) return (num / 1000).toFixed(1) + 'K+';
+  if (num >= 1000000000) {
+    const value = num / 1000000000;
+    return Number.isInteger(value) ? `${value}B+` : `${value.toFixed(1)}B+`;
+  }
+
+  if (num >= 1000000) {
+    const value = num / 1000000;
+    return Number.isInteger(value) ? `${value}M+` : `${value.toFixed(1)}M+`;
+  }
+
+  if (num >= 1000) {
+    const value = num / 1000;
+    return Number.isInteger(value) ? `${value}K+` : `${value.toFixed(1)}K+`;
+  }
 
   return installs;
 }
 
-// 🔥 STEP 1: DIRECT FETCH
+// Direct fetch
 async function fetchApp(appId) {
   try {
     return await gplay.app({ appId });
@@ -25,16 +36,29 @@ async function fetchApp(appId) {
   }
 }
 
-// 🔥 STEP 2: FALLBACK SEARCH (VERY IMPORTANT)
+// Fallback search
 async function fallbackSearch(appId) {
   try {
+    const keyword = appId.split('.').pop();
+
     const res = await gplay.search({
-      term: appId,
-      num: 1
+      term: keyword,
+      num: 5
     });
 
-    if (res && res.length > 0) {
-      return await gplay.app({ appId: res[0].appId });
+    if (!res || res.length === 0) {
+      return null;
+    }
+
+    // exact package match search
+    const exactMatch = res.find(
+      app => app.appId?.toLowerCase() === appId.toLowerCase()
+    );
+
+    if (exactMatch) {
+      return await gplay.app({
+        appId: exactMatch.appId
+      });
     }
 
     return null;
@@ -43,7 +67,7 @@ async function fallbackSearch(appId) {
   }
 }
 
-// 🔥 STEP 3: SAFE FETCH (FINAL LOGIC)
+// Safe fetch
 async function safeGetApp(appId) {
   let app = await fetchApp(appId);
 
@@ -62,7 +86,10 @@ async function main() {
     scopes: ['https://www.googleapis.com/auth/spreadsheets']
   });
 
-  const sheets = google.sheets({ version: 'v4', auth });
+  const sheets = google.sheets({
+    version: 'v4',
+    auth
+  });
 
   const sheetId = process.env.SHEET_ID;
 
@@ -76,28 +103,47 @@ async function main() {
   const output = [];
 
   for (let i = 0; i < rows.length; i++) {
-    const appId = rows[i][0]?.trim();
+    const value = rows[i][0]?.trim();
 
-    if (!appId) {
+    if (!value) {
       output.push(['']);
       continue;
     }
 
-    const app = await safeGetApp(appId);
-
-    if (app && app.installs) {
-      output.push([formatInstalls(app.installs)]);
-      console.log(`${appId} => OK`);
-    } else {
-      output.push(['NOT FOUND']);
-      console.log(`${appId} => NOT FOUND`);
+    // IOS URL CHECK
+    if (
+      value.includes('apps.apple.com') ||
+      value.startsWith('http://apps.apple.com') ||
+      value.startsWith('https://apps.apple.com')
+    ) {
+      output.push(['IOS APP']);
+      console.log(`${value} => IOS APP`);
+      continue;
     }
 
-    // 🔥 anti-block delay
+    try {
+      const app = await safeGetApp(value);
+
+      if (app && app.installs) {
+        const installs = formatInstalls(app.installs);
+
+        output.push([installs]);
+
+        console.log(`${value} => ${installs}`);
+      } else {
+        output.push(['NOT FOUND']);
+
+        console.log(`${value} => NOT FOUND`);
+      }
+    } catch (error) {
+      output.push(['NOT FOUND']);
+
+      console.log(`${value} => NOT FOUND`);
+    }
+
     await delay(300);
   }
 
-  // 🔥 WRITE BACK TO SHEET
   await sheets.spreadsheets.values.update({
     spreadsheetId: sheetId,
     range: `H2:H${output.length + 1}`,
@@ -107,7 +153,7 @@ async function main() {
     }
   });
 
-  console.log("🔥 DONE - SHEET UPDATED");
+  console.log(`🔥 DONE - Updated ${output.length} rows`);
 }
 
 main().catch(console.error);
