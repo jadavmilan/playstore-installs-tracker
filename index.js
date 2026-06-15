@@ -131,14 +131,14 @@ async function main() {
 
         console.log(`${value} => ${installs}`);
       } else {
-        output.push(['NOT FOUND']);
+        output.push(['NO DETECT']);
 
-        console.log(`${value} => NOT FOUND`);
+        console.log(`${value} => NO DETECT`);
       }
     } catch (error) {
-      output.push(['NOT FOUND']);
+      output.push(['NO DETECT']);
 
-      console.log(`${value} => NOT FOUND`);
+      console.log(`${value} => NO DETECT`);
     }
 
     await delay(300);
